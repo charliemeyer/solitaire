@@ -63,11 +63,17 @@ class CardStack(object):
     def popRun(self):
         ret = self.cards[-self.runlen:]
         self.cards = self.cards[0:-self.runlen]
+        if self.top() is not None:
+            self.top().flip()
         return ret
 
     def addRun(self, run):
         self.cards += run
         self.runlen += len(run)
+        if self.runlen == 13:
+            self.cards = self.cards[-13:]
+        if self.top() is not None:
+            self.top().flip()
 
 class Board(object):
     """docstring for Stacks"""
@@ -85,21 +91,21 @@ class Board(object):
         self.suits_left = 5
         
     def pprint(self):
-        # os.system('cls' if os.name == 'nt' else 'clear')
-        finished_stacks = 0
+        os.system('cls' if os.name == 'nt' else 'clear')
         level = 0
         labels = ""
         for i in range(10):
             labels += " " + str(i) + "(%d) " % self.stacks[i].runlen 
         print labels
-        while finished_stacks < 10:
+        finishedStacks = [0 for i in range(10)]
+        while sum(finishedStacks) < 10:
             row = ""
-            for i in range(len(self.stacks)):
+            for i in range(10):
                 if level < self.stacks[i].height():
                     row += self.stacks[i].getCard(level).to_str() 
                 else:
                     row += "     "
-                    finished_stacks += 1
+                    finishedStacks[i] = 1
                 row += " "
             print row
             level += 1
@@ -119,7 +125,6 @@ class Board(object):
             return move_failure("No stacks left.")
 
     def move_stacks(self, src, dest):
-        print "trying to move from %d to %d" % (src, dest)
         if src not in range(10) or dest not in range(10):
             return move_failure("Stack numbers out of range.")
         if self.stacks[dest].height() == 0:
