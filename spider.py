@@ -35,21 +35,21 @@ class CardStack(object):
     def __init__(self, ind):
         super(CardStack, self).__init__()
         self.cards = []
-        self.runlen = 0
+        self.runlens = [0]
         self.stackNum = ind
     
     def getCard(self, ind):
         return self.cards[ind]  
 
-    def add(self, card):
+    def add(self, newcards):
         # print "Adding card with suit %d on stack %d. Height is %d. %s" % (card.suit, self.stackNum, self.height(), ("" if self.height() == 0 else ("Top stack has suit %d" % self.cards[-1].suit)))
         if self.height() == 0:
-            self.runlen = 1
-        elif self.cards[-1].shown and self.cards[-1].suit == card.suit + 1:
-            self.runlen += 1
+            self.runlens[-1] = len(newcards)
+        elif self.cards[-1].shown and self.cards[-1].suit == newcards[0].suit + 1:
+            self.runlens[-1] += len(newcards)
         else:
-            self.runlen = 1
-        self.cards.append(card)
+            self.runlens.append(len(newcards)) # should always be 1
+        self.cards += newcards
 
     def height(self):
         return len(self.cards)
@@ -57,23 +57,21 @@ class CardStack(object):
     def top(self):
         return self.cards[-1] if self.height() > 0 else None
 
+    def top_run(self):
+        return self.cards[-self.runlens[-1]:]
+
     def runStart(self):
-        return self.cards[-self.runlen] if self.height() > 0 else None
+        return self.cards[-self.runlens[-1]] if self.height() > 0 else None
 
     def popRun(self):
-        ret = self.cards[-self.runlen:]
-        self.cards = self.cards[0:-self.runlen]
+        ret = self.top_run()
+        self.cards = self.cards[0:-self.runlens[-1]]
+        del self.runlens[-1]
+        if len(self.cards) == 0:
+            self.runlens.append(0)
         if self.top() is not None:
             self.top().flip()
         return ret
-
-    def addRun(self, run):
-        self.cards += run
-        self.runlen += len(run)
-        if self.runlen == 13:
-            self.cards = self.cards[-13:]
-        if self.top() is not None:
-            self.top().flip()
 
 class Board(object):
     """docstring for Stacks"""
@@ -85,17 +83,18 @@ class Board(object):
         random.shuffle(self.cards)
         self.stacks = [CardStack(i) for i in range(10)]
         for i in range(54):
-            self.stacks[i % 10].add(self.cards[i])
+            self.stacks[i % 10].add([self.cards[i]])
             if i >= 44: 
                 self.cards[i].flip()
         self.suits_left = 5
+        self.stacks_cleared = 0
         
     def pprint(self):
         os.system('cls' if os.name == 'nt' else 'clear')
         level = 0
         labels = ""
         for i in range(10):
-            labels += " " + str(i) + "(%d) " % self.stacks[i].runlen 
+            labels += " " + str(i) + "(%d) " % self.stacks[i].runlens[-1] 
         print labels
         finishedStacks = [0 for i in range(10)]
         while sum(finishedStacks) < 10:
@@ -111,16 +110,20 @@ class Board(object):
             level += 1
 
         print "      " * 9 + "X" * self.suits_left
+        print "      " * 9 + "*" * self.stacks_cleared
         print "\n" + "_" * 60
 
     def hitme(self):
         if self.suits_left > 0:
-            for i in range(10):
-                card = self.cards[INIT_CARDS_DEALT + (5-self.suits_left)*10 + i]
-                card.flip()
-                self.stacks[i].add(card)
-            self.suits_left -= 1
-            return move_success()
+            if min([s.height for s in self.stacks]) > 0:
+                for i in range(10):
+                    card = self.cards[INIT_CARDS_DEALT + (5-self.suits_left)*10 + i]
+                    card.flip()
+                    self.stacks[i].add([card])
+                self.suits_left -= 1
+                return move_success()
+            else: 
+                return move_failure("Can't hitme with empty stacks.")
         else:
             return move_failure("No stacks left.")
 
@@ -137,7 +140,13 @@ class Board(object):
         return move_success()
 
     def move_cards(self, src, dest):
-        self.stacks[dest].addRun(self.stacks[src].popRun())
+        self.stacks[dest].add(self.stacks[src].popRun())
+
+    def clear_finished_stacks():
+        for s in self.stacks:
+            if len(s.top_run()) == 13:
+                s.popRun()
+                self.stacks_cleared += 1
 
 class Game(object):
     """docstring for Game"""
