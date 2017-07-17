@@ -93,6 +93,7 @@ class Board(object):
         os.system('cls' if os.name == 'nt' else 'clear')
         level = 0
         labels = ""
+        self.clear_finished_stacks()
         for i in range(10):
             labels += " " + str(i) + "(%d) " % self.stacks[i].runlens[-1] 
         print labels
@@ -112,6 +113,9 @@ class Board(object):
         print "      " * 9 + "X" * self.suits_left
         print "      " * 9 + "*" * self.stacks_cleared
         print "\n" + "_" * 60
+        # if you've cleared 8 stacks, you're done!
+        return self.stacks_cleared == 8
+
 
     def hitme(self):
         if self.suits_left > 0:
@@ -142,7 +146,7 @@ class Board(object):
     def move_cards(self, src, dest):
         self.stacks[dest].add(self.stacks[src].popRun())
 
-    def clear_finished_stacks():
+    def clear_finished_stacks(self):
         for s in self.stacks:
             if len(s.top_run()) == 13:
                 s.popRun()
@@ -165,7 +169,10 @@ class Game(object):
         print "Welcome to Solitaire"
         while(move != "quit"):
             if result[0]:
-                self.board.pprint()
+                done = self.board.pprint()
+                if done:
+                    print "Congratulations, you've won! :)"
+                    break
                 move = raw_input(prompt)
             else: 
                 move = raw_input(("Bad move. " if result[1] == "" else result[1]) + " " + prompt)
