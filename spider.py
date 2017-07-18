@@ -3,7 +3,7 @@ import os
 import inspect
 card_names = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"]
 
-INIT_CARDS_DEALT = 44
+INIT_CARDS_DEALT = 54
 
 def move_success():
     return (True, "")
