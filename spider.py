@@ -60,15 +60,15 @@ class CardStack(object):
     def top_run(self):
         return self.cards[-self.runlens[-1]:]
 
-    def runStart(self):
-        return self.cards[-self.runlens[-1]] if self.height() > 0 else None
+    def runStart(self, run_length):
+        return self.cards[-self.runlens[-1]] if run_length is None else self.cards[-run_length]
 
-    def popRun(self):
-        ret = self.top_run()
-        self.cards = self.cards[0:-self.runlens[-1]]
-        del self.runlens[-1]
-        if len(self.cards) == 0:
-            self.runlens.append(0)
+    def popRun(self, num_cards):
+        ret = self.cards[-num_cards:]
+        self.runlens[-1] -= num_cards
+        if len(self.runlens) > 1 and self.runlens[-1] == 0:
+            del self.runlens[-1]
+        self.cards = self.cards[0:-len(ret)]
         if self.top() is not None:
             self.top().flip()
         return ret
@@ -94,9 +94,7 @@ class Board(object):
         level = 0
         labels = ""
         self.clear_finished_stacks()
-        for i in range(10):
-            labels += " " + str(i) + "(%d) " % self.stacks[i].runlens[-1] 
-        print labels
+        print "|".join(["_ %d _" % i for i in range(10)])
         finishedStacks = [0 for i in range(10)]
         while sum(finishedStacks) < 10:
             row = ""
@@ -131,25 +129,29 @@ class Board(object):
         else:
             return move_failure("No stacks left.")
 
-    def move_stacks(self, src, dest):
+    def move_stacks(self, src, dest, num_cards=None):
         if src not in range(10) or dest not in range(10):
             return move_failure("Stack numbers out of range.")
+        if num_cards > len(self.stacks[src].top_run()):
+            return move_failure("Source card number too high (max = %d)" % len(self.stacks[src].top_run()))
         if self.stacks[dest].height() == 0:
-            self.move_cards(src, dest)
+            self.move_cards(src, dest, num_cards)
         else:
-            if self.stacks[dest].top().suit == self.stacks[src].runStart().suit + 1:
-                self.move_cards(src, dest)
+            if self.stacks[dest].top().suit == self.stacks[src].runStart(num_cards).suit + 1:
+                self.move_cards(src, dest, num_cards)
             else:
                 return move_failure("Suits don't match.")
         return move_success()
 
-    def move_cards(self, src, dest):
-        self.stacks[dest].add(self.stacks[src].popRun())
+    def move_cards(self, src, dest, num_cards=None):
+        if num_cards is None:
+            num_cards = len(self.stacks[src].top_run())
+        self.stacks[dest].add(self.stacks[src].popRun(num_cards))
 
     def clear_finished_stacks(self):
         for s in self.stacks:
             if len(s.top_run()) == 13:
-                s.popRun()
+                s.popRun(13)
                 self.stacks_cleared += 1
 
 class Game(object):
@@ -183,9 +185,16 @@ class Game(object):
     def parse_move(self, move):
         moveSplit = move.split(" ")
         moveName = moveSplit[0]
+
+        def valid_arg_nums(f):
+            if m.func_defaults:
+                return [m.func_code.co_argcount, m.func_code.co_argcount - len(m.func_defaults)]
+            else:
+                return [m.func_code.co_argcount]
+
         if moveName in self.moves:
             m = self.moves[moveName]
-            if len(moveSplit) == m.func_code.co_argcount:
+            if len(moveSplit) in valid_arg_nums(m):
                 try:
                     # somewhat sloppy: only allow integer arguments to moves
                     return self.execute_move(m, [int(nstr) for nstr in moveSplit[1:]])
@@ -206,8 +215,8 @@ class Game(object):
     def hitme(self):
         return self.board.hitme()
 
-    def transfer(self, src, dest):
-        return self.board.move_stacks(src, dest)
+    def transfer(self, src, dest, num_cards=None):
+        return self.board.move_stacks(src, dest, num_cards)
 
 def main():
     g = Game()
